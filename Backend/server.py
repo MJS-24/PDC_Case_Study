@@ -1,10 +1,14 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI #type: ignore
+from fastapi.middleware.cors import CORSMiddleware #type: ignore
+import uvicorn #type: ignore
 import os
 import sys
+from contextlib import asynccontextmanager
 
-# Add backend to path
-sys.path.insert(0, os.path.dirname(__file__))
+
+
+# Add project root to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from Backend.api import router, initialize_services
 
@@ -62,5 +66,4 @@ async def root():
 
 
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -1,27 +1,8 @@
-# Utility functions for the backend
+"""
+Utils package - contains utility functions
+"""
 
-def format_currency(value: float) -> str:
-    """Format a number as currency"""
-    return f"${value:,.2f}"
+from .formatting import format_currency, format_percentage
+from .calculations import calculate_percentage_change
 
-
-def format_percentage(value: float) -> str:
-    """Format a number as percentage"""
-    return f"{value:.2f}%"
-
-
-def calculate_percentage_change(old_value: float, new_value: float) -> float:
-    """
-    Calculate percentage change between two values
-    
-    Args:
-        old_value: Original value
-        new_value: New value
-        
-    Returns:
-        Percentage change
-    """
-    if old_value == 0:
-        return 0
-    
-    return ((new_value - old_value) / old_value) * 100
+__all__ = ["format_currency", "format_percentage", "calculate_percentage_change"]
