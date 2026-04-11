@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8000/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -9,7 +9,6 @@ const apiClient = axios.create({
   },
 });
 
-// ============ HEALTH CHECK ============
 export const healthCheck = async () => {
   try {
     const response = await apiClient.get('/health');
@@ -20,7 +19,6 @@ export const healthCheck = async () => {
   }
 };
 
-// ============ DASHBOARD ============
 export const dashboardApi = {
   getSummary: async () => {
     try {
@@ -33,106 +31,6 @@ export const dashboardApi = {
   },
 };
 
-// ============ INVENTORY ============
-export const inventoryApi = {
-  getLowStock: async () => {
-    try {
-      const response = await apiClient.get('/inventory/low-stock');
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching low stock:', error);
-      throw error;
-    }
-  },
-
-  getBranchInventory: async (branchId) => {
-    try {
-      const response = await apiClient.get(`/inventory/branch/${branchId}`);
-      return response.data;
-    } catch (error) {
-      console.error(`Error fetching inventory for ${branchId}:`, error);
-      throw error;
-    }
-  },
-
-  getValuation: async () => {
-    try {
-      const response = await apiClient.get('/inventory/valuation');
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching inventory valuation:', error);
-      throw error;
-    }
-  },
-};
-
-// ============ SALES ============
-export const salesApi = {
-  getByCategory: async () => {
-    try {
-      const response = await apiClient.get('/sales/by-category');
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching sales by category:', error);
-      throw error;
-    }
-  },
-
-  getByBranch: async () => {
-    try {
-      const response = await apiClient.get('/sales/by-branch');
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching branch performance:', error);
-      throw error;
-    }
-  },
-
-  getRecent: async (days = 7) => {
-    try {
-      const response = await apiClient.get('/sales/recent', { params: { days } });
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching recent sales:', error);
-      throw error;
-    }
-  },
-};
-
-// ============ LOGISTICS ============
-export const logisticsApi = {
-  getDeliverySummary: async () => {
-    try {
-      const response = await apiClient.get('/deliveries/summary');
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching delivery summary:', error);
-      throw error;
-    }
-  },
-
-  getDelayedDeliveries: async () => {
-    try {
-      const response = await apiClient.get('/deliveries/delayed');
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching delayed deliveries:', error);
-      throw error;
-    }
-  },
-
-  getFleetEfficiency: async () => {
-    try {
-      const response = await apiClient.get('/fleet/efficiency');
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching fleet efficiency:', error);
-      throw error;
-    }
-  },
-};
-
-// ============ STOCK API ============
 export const stockApi = {
   getAllStocks: async () => {
     try {
@@ -144,34 +42,21 @@ export const stockApi = {
     }
   },
 
-  getStockAnalysis: async (symbol) => {
+  getStockHistory: async (company) => {
     try {
-      const response = await apiClient.get(`/stocks/${symbol}/analysis`);
+      const response = await apiClient.get(`/stocks/${company}`);
       return response.data;
     } catch (error) {
-      console.error('Error fetching stock analysis:', error);
+      console.error(`Error fetching history for ${company}:`, error);
       throw error;
     }
   },
-
-  getStockHistory: async (symbol) => {
-    try {
-      const response = await apiClient.get(`/stocks/${symbol}/history`);
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching stock history:', error);
-      throw error;
-    }
-  }
 };
 
-// ============ PORTFOLIO API ============
 export const portfolioApi = {
-  getPortfolio: async (userId) => {
+  getPortfolio: async () => {
     try {
-      const response = await apiClient.get('/portfolio', {
-        params: { user_id: userId }
-      });
+      const response = await apiClient.get('/portfolio');
       return response.data;
     } catch (error) {
       console.error('Error fetching portfolio:', error);
@@ -179,11 +64,9 @@ export const portfolioApi = {
     }
   },
 
-  getTransactions: async (userId) => {
+  getTransactions: async () => {
     try {
-      const response = await apiClient.get('/transactions', {
-        params: { user_id: userId }
-      });
+      const response = await apiClient.get('/transactions');
       return response.data;
     } catch (error) {
       console.error('Error fetching transactions:', error);
@@ -191,31 +74,53 @@ export const portfolioApi = {
     }
   },
 
-  buyStock: async (userId, symbol, quantity) => {
+  buyStock: async (company, quantity) => {
     try {
-      const response = await apiClient.post('/portfolio/buy', {
-        user_id: userId,
-        symbol,
-        quantity
+      const response = await apiClient.post('/buy', {
+        company,
+        quantity,
       });
       return response.data;
     } catch (error) {
-      console.error('Error buying stock:', error);
+      console.error(`Error buying ${company}:`, error);
       throw error;
     }
   },
 
-  sellStock: async (userId, symbol, quantity) => {
+  sellStock: async (company, quantity) => {
     try {
-      const response = await apiClient.post('/portfolio/sell', {
-        user_id: userId,
-        symbol,
-        quantity
+      const response = await apiClient.post('/sell', {
+        company,
+        quantity,
       });
       return response.data;
     } catch (error) {
-      console.error('Error selling stock:', error);
+      console.error(`Error selling ${company}:`, error);
       throw error;
     }
-  }
+  },
+};
+
+export const balanceApi = {
+  getBalance: async () => {
+    try {
+      const response = await apiClient.get('/balance');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching balance:', error);
+      throw error;
+    }
+  },
+
+  addBalance: async (amount) => {
+    try {
+      const response = await apiClient.post('/balance/add', {
+        amount,
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error adding balance:', error);
+      throw error;
+    }
+  },
 };

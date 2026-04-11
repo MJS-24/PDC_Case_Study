@@ -2,10 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { stockApi, portfolioApi } from '../services/api';
 import StockChart from '../charts/StockChart';
 
-export default function BuySellPage({ selectedSymbol, userId }) {
-  const [symbol, setSymbol] = useState(selectedSymbol || 'AAPL');
+export default function BuySellPage({ selectedCompany, onCompanyChange }) {
+  const [company, setCompany] = useState(selectedCompany || 'AAPL');
   const [quantity, setQuantity] = useState(1);
-  const [analysis, setAnalysis] = useState(null);
   const [history, setHistory] = useState([]);
   const [portfolio, setPortfolio] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -14,8 +13,8 @@ export default function BuySellPage({ selectedSymbol, userId }) {
   const [availableStocks, setAvailableStocks] = useState([]);
 
   useEffect(() => {
-    setSymbol(selectedSymbol || 'AAPL');
-  }, [selectedSymbol]);
+    setCompany(selectedCompany || 'AAPL');
+  }, [selectedCompany]);
 
   useEffect(() => {
     fetchStocks();
@@ -23,7 +22,7 @@ export default function BuySellPage({ selectedSymbol, userId }) {
 
   useEffect(() => {
     fetchData();
-  }, [symbol, userId]);
+  }, [company]);
 
   const fetchStocks = async () => {
     try {
@@ -35,16 +34,14 @@ export default function BuySellPage({ selectedSymbol, userId }) {
   };
 
   const fetchData = async () => {
-    console.log('BuySellPage: Fetching data for', symbol);
+    console.log('BuySellPage: Fetching data for', company);
     setLoading(true);
     try {
-      const [analysisData, historyData, portfolioData] = await Promise.all([
-        stockApi.getStockAnalysis(symbol),
-        stockApi.getStockHistory(symbol),
-        portfolioApi.getPortfolio(userId),
+      const [historyData, portfolioData] = await Promise.all([
+        stockApi.getStockHistory(company),
+        portfolioApi.getPortfolio(),
       ]);
-      console.log('BuySellPage: Data fetched', { analysisData, historyData, portfolioData });
-      setAnalysis(analysisData);
+      console.log('BuySellPage: Data fetched', { historyData, portfolioData });
       setHistory(historyData.history || []);
       setPortfolio(portfolioData);
     } catch (error) {
@@ -62,14 +59,15 @@ export default function BuySellPage({ selectedSymbol, userId }) {
     }
 
     try {
-      const result = await portfolioApi.buyStock(userId, symbol, parseInt(quantity));
+      const result = await portfolioApi.buyStock(company, parseInt(quantity));
       if (result.success) {
         setMessage({
           type: 'success',
-          text: `✓ Bought ${quantity} shares of ${symbol}`,
+          text: `✓ Bought ${quantity} shares of ${company}`,
         });
         setQuantity(1);
         fetchData();
+        if (onCompanyChange) onCompanyChange(company);
       } else {
         setMessage({ type: 'error', text: result.message });
       }
@@ -86,14 +84,15 @@ export default function BuySellPage({ selectedSymbol, userId }) {
     }
 
     try {
-      const result = await portfolioApi.sellStock(userId, symbol, parseInt(quantity));
+      const result = await portfolioApi.sellStock(company, parseInt(quantity));
       if (result.success) {
         setMessage({
           type: 'success',
-          text: `✓ Sold ${quantity} shares of ${symbol}`,
+          text: `✓ Sold ${quantity} shares of ${company}`,
         });
         setQuantity(1);
         fetchData();
+        if (onCompanyChange) onCompanyChange(company);
       } else {
         setMessage({ type: 'error', text: result.message });
       }
@@ -103,13 +102,13 @@ export default function BuySellPage({ selectedSymbol, userId }) {
     }
   };
 
-  const holding = portfolio?.holdings[symbol];
-  const currentPrice = analysis?.current_price || 0;
+  const holding = portfolio?.holdings?.find(h => h.company === company);
+  const currentPrice = history.length > 0 ? history[history.length - 1].close : 0;
   const currentValue = currentPrice * quantity;
 
   return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold text-white mb-8">💰 Buy / Sell Stocks</h1>
+    <div className="max-w-6xl mx-auto p-6">
+      <h1 className="text-3xl font-bold text-white mb-8 text-center">💰 Buy / Sell Stocks</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Chart */}
@@ -119,10 +118,10 @@ export default function BuySellPage({ selectedSymbol, userId }) {
               Loading chart data...
             </div>
           ) : history.length > 0 ? (
-            <StockChart data={history} symbol={symbol} />
+            <StockChart data={history} symbol={company} />
           ) : (
             <div className="bg-gray-800 rounded-lg p-6 text-center text-gray-400">
-              No chart data available for {symbol}
+              No chart data available for {company}
             </div>
           )}
         </div>
@@ -133,65 +132,45 @@ export default function BuySellPage({ selectedSymbol, userId }) {
             {/* Stock Selector */}
             <div className="mb-6">
               <label className="block text-gray-300 text-sm mb-2">
-                Select Stock
+                Select Company
               </label>
               <select
-                value={symbol}
-                onChange={(e) => setSymbol(e.target.value)}
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
                 className="w-full px-3 py-2 bg-gray-700 text-white rounded-lg focus:outline-none focus:border-green-500"
               >
                 {availableStocks.map((stock) => (
-                  <option key={stock.symbol} value={stock.symbol}>
-                    {stock.symbol} - {stock.name}
+                  <option key={stock.company} value={stock.company}>
+                    {stock.company} - {stock.name}
                   </option>
                 ))}
               </select>
             </div>
 
             <h2 className="text-2xl font-bold text-white mb-6">
-              {symbol}
+              {company}
             </h2>
 
-            {analysis && (
-              <div className="space-y-3 mb-6">
-                <div className="bg-gray-700 rounded-lg p-3">
-                  <p className="text-gray-400 text-sm">Current Price</p>
-                  <p className="text-2xl font-bold text-green-400">
-                    ${currentPrice.toFixed(2)}
-                  </p>
-                </div>
-
-                <div className="bg-gray-700 rounded-lg p-3">
-                  <p className="text-gray-400 text-sm">Recommendation</p>
-                  <p
-                    className={`text-xl font-bold ${
-                      analysis.recommendation === 'BUY'
-                        ? 'text-green-400'
-                        : analysis.recommendation === 'SELL'
-                        ? 'text-red-400'
-                        : 'text-yellow-400'
-                    }`}
-                  >
-                    {analysis.recommendation}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Confidence: {(analysis.confidence * 100).toFixed(0)}%
-                  </p>
-                </div>
-
-                {holding && (
-                  <div className="bg-gray-700 rounded-lg p-3">
-                    <p className="text-gray-400 text-sm">You Own</p>
-                    <p className="text-lg font-bold text-white">
-                      {holding.quantity} shares
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      @ ${holding.buy_price.toFixed(2)}
-                    </p>
-                  </div>
-                )}
+            <div className="space-y-3 mb-6">
+              <div className="bg-gray-700 rounded-lg p-3">
+                <p className="text-gray-400 text-sm">Current Price</p>
+                <p className="text-2xl font-bold text-green-400">
+                  ${currentPrice.toFixed(2)}
+                </p>
               </div>
-            )}
+
+              {holding && (
+                <div className="bg-gray-700 rounded-lg p-3">
+                  <p className="text-gray-400 text-sm">You Own</p>
+                  <p className="text-lg font-bold text-white">
+                    {holding.shares} shares
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    @ ${holding.avg_price.toFixed(2)}
+                  </p>
+                </div>
+              )}
+            </div>
 
             {/* Trade Section */}
             <div className="border-t border-gray-700 pt-6">

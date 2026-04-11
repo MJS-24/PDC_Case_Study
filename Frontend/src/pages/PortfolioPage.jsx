@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { portfolioApi } from '../services/api';
 
-export default function PortfolioPage({ userId }) {
+export default function PortfolioPage() {
   const [portfolio, setPortfolio] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -10,12 +10,12 @@ export default function PortfolioPage({ userId }) {
     fetchPortfolio();
     const interval = setInterval(fetchPortfolio, 5000);
     return () => clearInterval(interval);
-  }, [userId]);
+  }, []);
 
   const fetchPortfolio = async () => {
     console.log('PortfolioPage: Fetching portfolio...');
     try {
-      const data = await portfolioApi.getPortfolio(userId);
+      const data = await portfolioApi.getPortfolio();
       console.log('PortfolioPage: Portfolio fetched', data);
       setPortfolio(data);
       setError(null);
@@ -35,13 +35,10 @@ export default function PortfolioPage({ userId }) {
     return <div className="text-red-400 text-center py-10">{error}</div>;
   }
 
-  const profitLossColor = (portfolio?.profit_loss ?? 0) >= 0 ? 'text-green-400' : 'text-red-400';
-  const profitLossBgColor = (portfolio?.profit_loss ?? 0) >= 0 ? 'bg-green-900' : 'bg-red-900';
+  const profitLossColor = (portfolio?.total_pnl ?? 0) >= 0 ? 'text-green-400' : 'text-red-400';
+  const profitLossBgColor = (portfolio?.total_pnl ?? 0) >= 0 ? 'bg-green-900' : 'bg-red-900';
 
-  const rawHoldings = portfolio?.holdings || [];
-  const holdings = Array.isArray(rawHoldings)
-    ? rawHoldings
-    : Object.entries(rawHoldings).map(([symbol, item]) => ({ symbol, ...item }));
+  const holdings = portfolio?.holdings || [];
 
   return (
     <div className="p-8">
@@ -52,28 +49,28 @@ export default function PortfolioPage({ userId }) {
         <div className="bg-gray-800 rounded-lg p-6 shadow-lg">
           <p className="text-gray-400 text-sm">Total Invested</p>
           <p className="text-2xl font-bold text-white mt-2">
-            ${portfolio?.total_invested?.toFixed(2) || '0.00'}
+            ${portfolio?.total_cost?.toFixed(2) || '0.00'}
           </p>
         </div>
 
         <div className="bg-gray-800 rounded-lg p-6 shadow-lg">
           <p className="text-gray-400 text-sm">Current Value</p>
           <p className="text-2xl font-bold text-white mt-2">
-            ${portfolio?.current_value?.toFixed(2) || '0.00'}
+            ${portfolio?.total_value?.toFixed(2) || '0.00'}
           </p>
         </div>
 
         <div className={`rounded-lg p-6 shadow-lg ${profitLossBgColor}`}>
           <p className="text-gray-300 text-sm">Profit/Loss</p>
           <p className={`text-2xl font-bold mt-2 ${profitLossColor}`}>
-            ${portfolio?.profit_loss?.toFixed(2) || '0.00'}
+            ${portfolio?.total_pnl?.toFixed(2) || '0.00'}
           </p>
         </div>
 
         <div className="bg-gray-800 rounded-lg p-6 shadow-lg">
           <p className="text-gray-400 text-sm">Return %</p>
           <p className={`text-2xl font-bold mt-2 ${profitLossColor}`}>
-            {portfolio?.profit_loss_percent?.toFixed(2) || '0.00'}%
+            {portfolio?.total_pnl_percent?.toFixed(2) || '0.00'}%
           </p>
         </div>
       </div>
@@ -94,53 +91,35 @@ export default function PortfolioPage({ userId }) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-700">
-                  <th className="text-left py-3 text-gray-300">Product</th>
-                  <th className="text-right py-3 text-gray-300">Quantity</th>
-                  <th className="text-right py-3 text-gray-300">Buy Price</th>
+                  <th className="text-left py-3 text-gray-300">Company</th>
+                  <th className="text-right py-3 text-gray-300">Shares</th>
+                  <th className="text-right py-3 text-gray-300">Avg Price</th>
                   <th className="text-right py-3 text-gray-300">Current Price</th>
-                  <th className="text-right py-3 text-gray-300">Total Value</th>
+                  <th className="text-right py-3 text-gray-300">Value</th>
                   <th className="text-right py-3 text-gray-300">P&L</th>
+                  <th className="text-right py-3 text-gray-300">P&L %</th>
                 </tr>
               </thead>
               <tbody>
-                {holdings.map((holding) => {
-                  const symbol = holding.symbol || holding.product_id || 'Unknown';
-                  const name = holding.product_name || symbol;
-                  const buyPrice = Number(holding.buy_price ?? holding.current_price ?? 0);
-                  const currentPrice = Number(holding.current_price ?? holding.buy_price ?? 0);
-                  const totalCost = holding.quantity * buyPrice;
-                  const currentValue = holding.quantity * currentPrice;
-                  const profitLoss = currentValue - totalCost;
-                  const profitLossPercent = totalCost > 0 ? ((profitLoss / totalCost) * 100).toFixed(2) : '0.00';
-                  const color = profitLoss >= 0 ? 'text-green-400' : 'text-red-400';
-
-                  return (
-                    <tr
-                      key={symbol}
-                      className="border-b border-gray-700 hover:bg-gray-700 transition-colors"
-                    >
-                      <td className="py-4 text-white font-semibold">
-                        {name}
-                        <div className="text-xs text-gray-500">{symbol}</div>
-                      </td>
-                      <td className="text-right text-gray-300">
-                        {holding.quantity}
-                      </td>
-                      <td className="text-right text-gray-300">
-                        ${buyPrice.toFixed(2)}
-                      </td>
-                      <td className="text-right text-gray-300">
-                        ${currentPrice.toFixed(2)}
-                      </td>
-                      <td className="text-right text-white font-semibold">
-                        ${currentValue.toFixed(2)}
-                      </td>
-                      <td className={`text-right font-semibold ${color}`}>
-                        ${profitLoss.toFixed(2)} ({profitLossPercent}%)
-                      </td>
-                    </tr>
-                  );
-                })}
+                {holdings.map((holding) => (
+                  <tr key={holding.company} className="border-b border-gray-700 hover:bg-gray-700">
+                    <td className="py-4 text-white font-semibold">{holding.company}</td>
+                    <td className="py-4 text-right text-gray-300">{holding.shares}</td>
+                    <td className="py-4 text-right text-gray-300">${holding.avg_price?.toFixed(2)}</td>
+                    <td className="py-4 text-right text-gray-300">${holding.current_price?.toFixed(2)}</td>
+                    <td className="py-4 text-right text-white font-semibold">${holding.value?.toFixed(2)}</td>
+                    <td className="py-4 text-right">
+                      <span className={holding.pnl >= 0 ? 'text-green-400' : 'text-red-400'}>
+                        ${holding.pnl?.toFixed(2)}
+                      </span>
+                    </td>
+                    <td className="py-4 text-right">
+                      <span className={holding.pnl_percent >= 0 ? 'text-green-400' : 'text-red-400'}>
+                        {holding.pnl_percent?.toFixed(2)}%
+                      </span>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

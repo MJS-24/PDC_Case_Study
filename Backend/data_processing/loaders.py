@@ -1,111 +1,101 @@
-"""CSV data loading with validation"""
+"""Stock data loading with validation"""
 
 import pandas as pd
 from pathlib import Path
-from ..utils.path_utils import DataPathResolver
+from utils.path_utils import DataPathResolver
+from typing import Dict, List
+import logging
 
+logger = logging.getLogger(__name__)
 
-class CSVDataLoader:
-    """Load all project CSVs with validation"""
-    
+class StockDataLoader:
+    """Load stock market data with validation"""
+
     # CSV file registry
     DATASETS = {
-        'products': 'products.csv',
-        'branches': 'branches.csv',
-        'inventory': 'inventory.csv',
-        'trucks': 'trucks.csv',
-        'transactions': 'transactions.csv',
-        'deliveries': 'delivery_logs.csv',
+        'stock_data': 'stock_details_5_years.csv',
     }
-    
+
     def __init__(self):
         """Initialize loader"""
-        self.data = {}
-    
-    def load_products(self) -> pd.DataFrame:
-        """Load product catalog"""
-        if 'products' not in self.data:
+        self.stock_data: Dict[str, pd.DataFrame] = {}
+        self.stocks_list: List[Dict] = []
+
+    def load_stock_data(self) -> Dict[str, pd.DataFrame]:
+        """Load stock data grouped by symbol"""
+        if not self.stock_data:
             try:
-                df = pd.read_csv(DataPathResolver.get_csv_path(self.DATASETS['products']))
-                
+                df = pd.read_csv(DataPathResolver.get_csv_path(self.DATASETS['stock_data']))
+
                 # Validate schema
-                required = ['product_id', 'product_name', 'category', 'unit_price', 'weight_kg']
+                required = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume', 'Company']
                 missing = [col for col in required if col not in df.columns]
                 if missing:
-                    raise ValueError(f"Missing columns in products.csv: {missing}")
-                
+                    raise ValueError(f"Missing columns in stock_details_5_years.csv: {missing}")
+
                 # Convert types
-                df['unit_price'] = pd.to_numeric(df['unit_price'], errors='coerce')
-                df['weight_kg'] = pd.to_numeric(df['weight_kg'], errors='coerce')
-                
-                self.data['products'] = df
-                print(f"✓ Loaded {len(df)} products")
+                df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+                df['Open'] = pd.to_numeric(df['Open'], errors='coerce')
+                df['High'] = pd.to_numeric(df['High'], errors='coerce')
+                df['Low'] = pd.to_numeric(df['Low'], errors='coerce')
+                df['Close'] = pd.to_numeric(df['Close'], errors='coerce')
+                df['Volume'] = pd.to_numeric(df['Volume'], errors='coerce')
+                df['Dividends'] = pd.to_numeric(df['Dividends'], errors='coerce')
+                df['Stock Splits'] = pd.to_numeric(df['Stock Splits'], errors='coerce')
+
+                # Drop rows with invalid data
+                df = df.dropna(subset=['Date', 'Open', 'High', 'Low', 'Close', 'Volume'])
+
+                # Group by company and sort by date
+                for symbol in df['Company'].unique():
+                    symbol_df = df[df['Company'] == symbol].copy()
+                    symbol_df = symbol_df.sort_values('Date').reset_index(drop=True)
+                    self.stock_data[symbol] = symbol_df
+
+                # Create stocks list
+                self.stocks_list = []
+                for company, data in self.stock_data.items():
+                    latest = data.iloc[-1]
+                    if latest is not None:
+                        close = float(latest['Close'])
+                        open_price = float(latest['Open'])
+                        volume = int(latest['Volume'])
+                        change = float(((close - open_price) / open_price * 100) if open_price != 0 else 0)
+                        self.stocks_list.append({
+                            'company': company,
+                            'name': company,  # Could map to full names if available
+                            'current_price': close,
+                            'change': change,
+                            'volume': volume
+                        })
+
+                logger.info(f"✓ Loaded data for {len(self.stock_data)} stocks")
+                print(f"✓ Loaded data for {len(self.stock_data)} stocks")
+
             except Exception as e:
-                print(f"✗ Error loading products: {e}")
+                logger.error(f"✗ Error loading stock data: {e}")
                 raise
-        
-        return self.data['products']
-    
-    def load_branches(self) -> pd.DataFrame:
-        """Load branch locations"""
-        if 'branches' not in self.data:
-            try:
-                df = pd.read_csv(DataPathResolver.get_csv_path(self.DATASETS['branches']))
-                df['capacity_sqm'] = pd.to_numeric(df['capacity_sqm'], errors='coerce')
-                self.data['branches'] = df
-                print(f"✓ Loaded {len(df)} branches")
-            except Exception as e:
-                print(f"✗ Error loading branches: {e}")
-                raise
-        
-        return self.data['branches']
-    
-    def load_inventory(self) -> pd.DataFrame:
-        """Load inventory levels"""
-        if 'inventory' not in self.data:
-            try:
-                df = pd.read_csv(DataPathResolver.get_csv_path(self.DATASETS['inventory']))
-                df['stock_level'] = pd.to_numeric(df['stock_level'], errors='coerce')
-                df['reorder_point'] = pd.to_numeric(df['reorder_point'], errors='coerce')
-                self.data['inventory'] = df
-                print(f"✓ Loaded {len(df)} inventory records")
-            except Exception as e:
-                print(f"✗ Error loading inventory: {e}")
-                raise
-        
-        return self.data['inventory']
-    
-    def load_transactions(self) -> pd.DataFrame:
-        """Load sales transactions"""
-        if 'transactions' not in self.data:
-            try:
-                df = pd.read_csv(DataPathResolver.get_csv_path(self.DATASETS['transactions']))
-                df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
-                df['quantity'] = pd.to_numeric(df['quantity'], errors='coerce')
-                df['total_amount'] = pd.to_numeric(df['total_amount'], errors='coerce')
-                self.data['transactions'] = df
-                print(f"✓ Loaded {len(df)} transactions")
-            except Exception as e:
-                print(f"✗ Error loading transactions: {e}")
-                raise
-        
-        return self.data['transactions']
-    
-    def load_trucks(self) -> pd.DataFrame:
-        """Load truck fleet"""
-        if 'trucks' not in self.data:
-            try:
-                df = pd.read_csv(DataPathResolver.get_csv_path(self.DATASETS['trucks']))
-                df['capacity_kg'] = pd.to_numeric(df['capacity_kg'], errors='coerce')
-                df['fuel_efficiency_kpl'] = pd.to_numeric(df['fuel_efficiency_kpl'], errors='coerce')
-                df['last_maintenance'] = pd.to_datetime(df['last_maintenance'], errors='coerce')
-                self.data['trucks'] = df
-                print(f"✓ Loaded {len(df)} trucks")
-            except Exception as e:
-                print(f"✗ Error loading trucks: {e}")
-                raise
-        
-        return self.data['trucks']
+
+        return self.stock_data
+
+    def get_stocks_list(self) -> List[Dict]:
+        """Get list of available stocks"""
+        if not self.stocks_list:
+            self.load_stock_data()
+        return self.stocks_list
+
+    def get_stock_data(self, company: str) -> pd.DataFrame:
+        """Get historical data for a specific stock"""
+        if not self.stock_data:
+            self.load_stock_data()
+        return self.stock_data.get(company, pd.DataFrame())
+
+    def get_latest_price(self, company: str) -> float:
+        """Get latest closing price for a stock"""
+        data = self.get_stock_data(company)
+        if not data.empty:
+            return data.iloc[-1]['Close']
+        return 0.0
     
     def load_deliveries(self) -> pd.DataFrame:
         """Load delivery logs"""

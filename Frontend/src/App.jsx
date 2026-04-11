@@ -6,12 +6,12 @@ import StocksPage from './pages/StocksPage';
 import BuySellPage from './pages/BuySellPage';
 import PortfolioPage from './pages/PortfolioPage';
 import TransactionsPage from './pages/TransactionsPage';
+import SettingsPage from './pages/SettingsPage';
 import { healthCheck } from './services/api';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [selectedStock, setSelectedStock] = useState('AAPL');
-  const [userId] = useState('user_demo_001');
+  const [selectedCompany, setSelectedCompany] = useState('AAPL');
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -73,20 +73,22 @@ function App() {
     try {
       switch (activeTab) {
         case 'dashboard':
-          return <DashboardPage userId={userId} />;
+          return <DashboardPage />;
         case 'stocks':
-          return <StocksPage onSelectStock={(symbol) => {
-            setSelectedStock(symbol);
+          return <StocksPage onSelectStock={(company) => {
+            setSelectedCompany(company);
             setActiveTab('buy-sell');
           }} />;
         case 'buy-sell':
-          return <BuySellPage selectedSymbol={selectedStock} userId={userId} />;
+          return <BuySellPage selectedCompany={selectedCompany} onCompanyChange={setSelectedCompany} />;
         case 'portfolio':
-          return <PortfolioPage userId={userId} />;
+          return <PortfolioPage />;
         case 'transactions':
-          return <TransactionsPage userId={userId} />;
+          return <TransactionsPage />;
+        case 'settings':
+          return <SettingsPage />;
         default:
-          return <DashboardPage userId={userId} />;
+          return <DashboardPage />;
       }
     } catch (err) {
       console.error('Error rendering content:', err);

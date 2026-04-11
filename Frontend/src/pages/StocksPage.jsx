@@ -28,7 +28,7 @@ export default function StocksPage({ onSelectStock }) {
   };
 
   const filteredStocks = stocks.filter((stock) =>
-    stock.symbol.toLowerCase().includes(searchTerm.toLowerCase())
+    stock.company.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (loading) {
@@ -58,7 +58,7 @@ export default function StocksPage({ onSelectStock }) {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredStocks.map((stock) => (
           <StockCard
-            key={stock.symbol}
+            key={stock.company}
             stock={stock}
             onSelect={onSelectStock}
           />
