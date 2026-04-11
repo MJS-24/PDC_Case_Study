@@ -11,14 +11,28 @@ export default function BuySellPage({ selectedSymbol, userId }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [transactionType, setTransactionType] = useState('buy');
+  const [availableStocks, setAvailableStocks] = useState([]);
 
   useEffect(() => {
     setSymbol(selectedSymbol || 'AAPL');
   }, [selectedSymbol]);
 
   useEffect(() => {
+    fetchStocks();
+  }, []);
+
+  useEffect(() => {
     fetchData();
   }, [symbol, userId]);
+
+  const fetchStocks = async () => {
+    try {
+      const stocks = await stockApi.getAllStocks();
+      setAvailableStocks(stocks);
+    } catch (error) {
+      console.error('Error fetching stocks:', error);
+    }
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -98,14 +112,40 @@ export default function BuySellPage({ selectedSymbol, userId }) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Chart */}
         <div className="lg:col-span-2">
-          {history.length > 0 && (
+          {loading ? (
+            <div className="bg-gray-800 rounded-lg p-6 text-center text-gray-400">
+              Loading chart data...
+            </div>
+          ) : history.length > 0 ? (
             <StockChart data={history} symbol={symbol} />
+          ) : (
+            <div className="bg-gray-800 rounded-lg p-6 text-center text-gray-400">
+              No chart data available for {symbol}
+            </div>
           )}
         </div>
 
         {/* Trade Panel */}
         <div>
           <div className="bg-gray-800 rounded-lg p-6 shadow-lg">
+            {/* Stock Selector */}
+            <div className="mb-6">
+              <label className="block text-gray-300 text-sm mb-2">
+                Select Stock
+              </label>
+              <select
+                value={symbol}
+                onChange={(e) => setSymbol(e.target.value)}
+                className="w-full px-3 py-2 bg-gray-700 text-white rounded-lg focus:outline-none focus:border-green-500"
+              >
+                {availableStocks.map((stock) => (
+                  <option key={stock.symbol} value={stock.symbol}>
+                    {stock.symbol} - {stock.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <h2 className="text-2xl font-bold text-white mb-6">
               {symbol}
             </h2>

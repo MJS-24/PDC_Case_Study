@@ -33,8 +33,13 @@ export default function PortfolioPage({ userId }) {
     return <div className="text-red-400 text-center py-10">{error}</div>;
   }
 
-  const profitLossColor = portfolio?.profit_loss >= 0 ? 'text-green-400' : 'text-red-400';
-  const profitLossBgColor = portfolio?.profit_loss >= 0 ? 'bg-green-900' : 'bg-red-900';
+  const profitLossColor = (portfolio?.profit_loss ?? 0) >= 0 ? 'text-green-400' : 'text-red-400';
+  const profitLossBgColor = (portfolio?.profit_loss ?? 0) >= 0 ? 'bg-green-900' : 'bg-red-900';
+
+  const rawHoldings = portfolio?.holdings || [];
+  const holdings = Array.isArray(rawHoldings)
+    ? rawHoldings
+    : Object.entries(rawHoldings).map(([symbol, item]) => ({ symbol, ...item }));
 
   return (
     <div className="p-8">
@@ -75,11 +80,11 @@ export default function PortfolioPage({ userId }) {
       <div className="bg-gray-800 rounded-lg p-6 shadow-lg">
         <h2 className="text-xl font-bold text-white mb-6">Portfolio Holdings</h2>
 
-        {Object.keys(portfolio?.holdings || {}).length === 0 ? (
+        {holdings.length === 0 ? (
           <div className="text-center py-8">
             <p className="text-gray-400 text-lg">No active holdings</p>
             <p className="text-gray-500 text-sm mt-2">
-              Start trading to build your portfolio
+              Start building your portfolio from current inventory
             </p>
           </div>
         ) : (
@@ -87,7 +92,7 @@ export default function PortfolioPage({ userId }) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-700">
-                  <th className="text-left py-3 text-gray-300">Symbol</th>
+                  <th className="text-left py-3 text-gray-300">Product</th>
                   <th className="text-right py-3 text-gray-300">Quantity</th>
                   <th className="text-right py-3 text-gray-300">Buy Price</th>
                   <th className="text-right py-3 text-gray-300">Current Price</th>
@@ -96,11 +101,15 @@ export default function PortfolioPage({ userId }) {
                 </tr>
               </thead>
               <tbody>
-                {Object.entries(portfolio.holdings).map(([symbol, holding]) => {
-                  const totalCost = holding.quantity * holding.buy_price;
-                  const currentValue = holding.quantity * holding.current_price;
+                {holdings.map((holding) => {
+                  const symbol = holding.symbol || holding.product_id || 'Unknown';
+                  const name = holding.product_name || symbol;
+                  const buyPrice = Number(holding.buy_price ?? holding.current_price ?? 0);
+                  const currentPrice = Number(holding.current_price ?? holding.buy_price ?? 0);
+                  const totalCost = holding.quantity * buyPrice;
+                  const currentValue = holding.quantity * currentPrice;
                   const profitLoss = currentValue - totalCost;
-                  const profitLossPercent = (profitLoss / totalCost * 100).toFixed(2);
+                  const profitLossPercent = totalCost > 0 ? ((profitLoss / totalCost) * 100).toFixed(2) : '0.00';
                   const color = profitLoss >= 0 ? 'text-green-400' : 'text-red-400';
 
                   return (
@@ -108,15 +117,18 @@ export default function PortfolioPage({ userId }) {
                       key={symbol}
                       className="border-b border-gray-700 hover:bg-gray-700 transition-colors"
                     >
-                      <td className="py-4 text-white font-semibold">{symbol}</td>
+                      <td className="py-4 text-white font-semibold">
+                        {name}
+                        <div className="text-xs text-gray-500">{symbol}</div>
+                      </td>
                       <td className="text-right text-gray-300">
                         {holding.quantity}
                       </td>
                       <td className="text-right text-gray-300">
-                        ${holding.buy_price.toFixed(2)}
+                        ${buyPrice.toFixed(2)}
                       </td>
                       <td className="text-right text-gray-300">
-                        ${holding.current_price.toFixed(2)}
+                        ${currentPrice.toFixed(2)}
                       </td>
                       <td className="text-right text-white font-semibold">
                         ${currentValue.toFixed(2)}
