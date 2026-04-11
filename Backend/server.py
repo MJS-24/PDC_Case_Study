@@ -2,16 +2,23 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import sys
+from pathlib import Path
 
-# Add backend to path
-sys.path.insert(0, os.path.dirname(__file__))
+# Add project root and backend path to sys.path for flexible startup
+backend_dir = Path(__file__).resolve().parent
+project_root = backend_dir.parent
+sys.path.insert(0, str(project_root))
+sys.path.insert(0, str(backend_dir))
 
-from Backend.api import router, initialize_services
+try:
+    from Backend.api.routes.analytics import router, initialize_services_api
+except ModuleNotFoundError:
+    from api.routes.analytics import router, initialize_services_api
 
 # Create FastAPI app
 app = FastAPI(
-    title="Stock Trading Simulation API",
-    description="API for stock trading simulation with real-time analysis and portfolio management",
+    title="Logistics & Distribution API",
+    description="Building materials distribution system with analytics",
     version="1.0.0"
 )
 
@@ -30,10 +37,9 @@ app.include_router(router)
 # Initialize services on startup
 @app.on_event("startup")
 async def startup_event():
-    """Initialize services when app starts"""
-    csv_path = os.path.join(os.path.dirname(__file__), "..", "data", "stocks.csv")
-    initialize_services(csv_path)
-    print(f"✓ Services initialized with data from: {csv_path}")
+    """Initialize all services"""
+    initialize_services_api()
+    print("✓ Analytics services initialized")
 
 
 @app.on_event("shutdown")
@@ -46,17 +52,18 @@ async def shutdown_event():
 async def root():
     """Root endpoint"""
     return {
-        "message": "Stock Trading Simulation API",
+        "message": "Logistics & Distribution API",
         "endpoints": {
-            "stocks": "/api/stocks",
-            "stock_detail": "/api/stocks/{symbol}",
-            "stock_history": "/api/stocks/{symbol}/history",
-            "portfolio": "/api/portfolio/{user_id}",
-            "buy": "/api/buy",
-            "sell": "/api/sell",
-            "transactions": "/api/transactions/{user_id}",
-            "analysis": "/api/analysis/all",
-            "health": "/api/health"
+            "dashboard": "/api/dashboard",
+            "inventory_low_stock": "/api/inventory/low-stock",
+            "inventory_branch": "/api/inventory/branch/{branch_id}",
+            "inventory_valuation": "/api/inventory/valuation",
+            "sales_by_category": "/api/sales/by-category",
+            "sales_by_branch": "/api/sales/by-branch",
+            "sales_recent": "/api/sales/recent",
+            "deliveries_summary": "/api/deliveries/summary",
+            "deliveries_delayed": "/api/deliveries/delayed",
+            "fleet_efficiency": "/api/fleet/efficiency"
         }
     }
 

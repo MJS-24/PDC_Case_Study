@@ -18,8 +18,9 @@ export default function DashboardPage({ userId }) {
       setPortfolio(data);
       setError(null);
     } catch (err) {
-      setError('Failed to fetch portfolio');
-      console.error(err);
+      console.error('Portfolio fetch error:', err);
+      setError('Failed to fetch portfolio data');
+      setPortfolio(null); // Ensure portfolio is null on error
     } finally {
       setLoading(false);
     }
@@ -79,23 +80,23 @@ export default function DashboardPage({ userId }) {
           <p className="text-gray-400">No active holdings. Start trading!</p>
         ) : (
           <div className="space-y-3">
-            {Object.entries(portfolio.holdings).map(([symbol, holding]) => (
+            {Object.entries(portfolio.holdings).map(([productId, holding]) => (
               <div
-                key={symbol}
+                key={productId}
                 className="bg-gray-700 rounded-lg p-4 flex justify-between items-center"
               >
                 <div>
-                  <p className="text-white font-semibold">{symbol}</p>
+                  <p className="text-white font-semibold">{holding.product_name || productId}</p>
                   <p className="text-gray-400 text-sm">
-                    {holding.quantity} shares @ ${holding.buy_price.toFixed(2)}
+                    {holding.quantity} units @ ${holding.buy_price?.toFixed(2) || '0.00'}
                   </p>
                 </div>
                 <div className="text-right">
                   <p className="text-white font-bold">
-                    ${holding.value.toFixed(2)}
+                    ${holding.total_value?.toFixed(2) || '0.00'}
                   </p>
                   <p className="text-gray-400 text-sm">
-                    Current: ${holding.current_price.toFixed(2)}
+                    Current: ${holding.current_price?.toFixed(2) || '0.00'}
                   </p>
                 </div>
               </div>

@@ -14,6 +14,7 @@ function App() {
   const [userId] = useState('user_demo_001');
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     // Check if backend is available
@@ -21,9 +22,11 @@ function App() {
       try {
         await healthCheck();
         setConnected(true);
+        setError(null);
       } catch (error) {
         console.error('Backend not available:', error);
         setConnected(false);
+        setError('Backend connection failed');
       } finally {
         setLoading(false);
       }
@@ -45,7 +48,7 @@ function App() {
     );
   }
 
-  if (!connected) {
+  if (error && !connected) {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-900">
         <div className="text-center bg-red-900 p-8 rounded-lg max-w-md">
@@ -54,7 +57,10 @@ function App() {
             Could not connect to the backend API at http://localhost:8000
           </p>
           <p className="text-red-400 text-xs">
-            Please ensure the Python backend is running: <code>python server.py</code>
+            Error: {error}
+          </p>
+          <p className="text-red-400 text-xs mt-4">
+            Please ensure the Python backend is running
           </p>
         </div>
       </div>
@@ -62,22 +68,35 @@ function App() {
   }
 
   const renderContent = () => {
-    switch (activeTab) {
-      case 'dashboard':
-        return <DashboardPage userId={userId} />;
-      case 'stocks':
-        return <StocksPage onSelectStock={(symbol) => {
-          setSelectedStock(symbol);
-          setActiveTab('buy-sell');
-        }} />;
-      case 'buy-sell':
-        return <BuySellPage selectedSymbol={selectedStock} userId={userId} />;
-      case 'portfolio':
-        return <PortfolioPage userId={userId} />;
-      case 'transactions':
-        return <TransactionsPage userId={userId} />;
-      default:
-        return <DashboardPage userId={userId} />;
+    try {
+      switch (activeTab) {
+        case 'dashboard':
+          return <DashboardPage userId={userId} />;
+        case 'stocks':
+          return <StocksPage onSelectStock={(symbol) => {
+            setSelectedStock(symbol);
+            setActiveTab('buy-sell');
+          }} />;
+        case 'buy-sell':
+          return <BuySellPage selectedSymbol={selectedStock} userId={userId} />;
+        case 'portfolio':
+          return <PortfolioPage userId={userId} />;
+        case 'transactions':
+          return <TransactionsPage userId={userId} />;
+        default:
+          return <DashboardPage userId={userId} />;
+      }
+    } catch (err) {
+      console.error('Error rendering content:', err);
+      return (
+        <div className="p-8">
+          <div className="bg-red-900 p-6 rounded-lg">
+            <h2 className="text-red-300 text-xl mb-2">⚠️ Rendering Error</h2>
+            <p className="text-red-200">Failed to render {activeTab} page</p>
+            <p className="text-red-400 text-sm mt-2">{err.message}</p>
+          </div>
+        </div>
+      );
     }
   };
 

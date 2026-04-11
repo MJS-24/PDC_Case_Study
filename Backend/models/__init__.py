@@ -1,53 +1,81 @@
-from pydantic import BaseModel
-from typing import List, Optional
+"""Data models for all entities"""
+
+from pydantic import BaseModel, Field
 from datetime import datetime
+from typing import List, Optional
 
 
-class StockData(BaseModel):
-    """Model for raw stock data from CSV"""
-    timestamp: str
-    symbol: str
-    open: float
-    high: float
-    low: float
-    close: float
-    volume: int
+class Product(BaseModel):
+    """Product catalog"""
+    product_id: str
+    product_name: str
+    category: str
+    unit_price: float
+    weight_kg: float
 
 
-class StockPrice(BaseModel):
-    """Model for current stock price"""
-    symbol: str
-    current_price: float
-    date: str
+class Branch(BaseModel):
+    """Distribution centers"""
+    branch_id: str
+    branch_name: str
+    city: str
+    region: str
+    capacity_sqm: int
 
 
-class StockAnalysis(BaseModel):
-    """Model for stock analysis results"""
-    symbol: str
-    current_price: float
-    moving_average_10: float
-    moving_average_20: float
-    volatility: float
-    recommendation: str  # BUY, SELL, HOLD
-    confidence: float
-    date: str
+class InventoryItem(BaseModel):
+    """Stock levels by branch"""
+    branch_id: str
+    product_id: str
+    stock_level: int
+    reorder_point: int
+    status: Optional[str] = None
 
 
 class Transaction(BaseModel):
-    """Model for buy/sell transactions"""
+    """Sales transactions"""
     transaction_id: str
-    symbol: str
-    transaction_type: str  # BUY or SELL
-    quantity: int
-    price: float
-    total_amount: float
     timestamp: datetime
+    branch_id: str
+    product_id: str
+    quantity: int
+    total_amount: float
+    customer_id: str
 
 
-class Portfolio(BaseModel):
-    """Model for user portfolio"""
-    user_id: str
-    holdings: dict  # {symbol: quantity}
+class Truck(BaseModel):
+    """Fleet vehicles"""
+    truck_id: str
+    type: str
+    capacity_kg: int
+    fuel_efficiency_kpl: float
+    last_maintenance: datetime
+
+
+class Delivery(BaseModel):
+    """Delivery logs"""
+    delivery_id: str
+    truck_id: str
+    timestamp: datetime
+    origin_branch: str
+    destination_branch: str
+    distance_km: float
+    fuel_consumed_liters: float
+    status: str
+
+
+class InventoryWithProduct(BaseModel):
+    """Inventory with product details"""
+    branch_id: str
+    branch_name: str
+    product_id: str
+    product_name: str
+    category: str
+    stock_level: int
+    reorder_point: int
+    unit_price: float
+    stock_value: float
+    status: str
     transaction_history: List[Transaction]
     total_invested: float
     current_value: float
