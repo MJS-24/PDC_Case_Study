@@ -1,15 +1,16 @@
-"""ML-OPTIMIZED stock service (FAST + simulation-aware + scalable)"""
+"""ML-OPTIMIZED + PARALLEL stock service (PDC ENABLED)"""
 
 from typing import List, Dict, Any
 from data_processing.loaders import StockDataLoader
 from models.ml_model import StockMLModel
+from concurrent.futures import ThreadPoolExecutor
 import logging
 
 logger = logging.getLogger(__name__)
 
 
 class StockService:
-    """Ultra-fast stock service with ML (optimized)"""
+    """Ultra-fast stock service with ML + Parallel Processing"""
 
     def __init__(self, loader: StockDataLoader):
         self.loader = loader
@@ -18,7 +19,7 @@ class StockService:
         self.stocks = self.loader.get_stocks_list()
         self.data = self.loader.stock_data
 
-        # 🔥 ML MODEL
+        # ML Model
         self.model = StockMLModel()
         self._train_model()
 
@@ -34,7 +35,7 @@ class StockService:
             logger.error(f"ML training failed: {e}")
 
     # ========================
-    # INTERNAL UTIL (FAST)
+    # INTERNAL UTIL
     # ========================
 
     def _get_index(self, index, length):
@@ -42,28 +43,14 @@ class StockService:
             return min(max(index, 0), length - 1)
         return length - 1
 
-    def _get_analysis(self, prices, idx):
-        start = max(0, idx - 10)
-        relevant_prices = prices[start:idx + 1]
-        return self.model.predict(relevant_prices)
-
-    # ========================
-    # CORE API METHODS
-    # ========================
-
-    def get_all_stocks(self, index: int = None) -> List[Dict[str, Any]]:
-        """
-        🔥 Optimized stock list (still ML-powered)
-        """
-
-        result = []
-
-        for stock in self.stocks:
+    def _process_single_stock(self, stock, index):
+        """🔥 This runs in parallel per stock"""
+        try:
             company = stock["company"]
             data = self.data.get(company)
 
             if not data:
-                continue
+                return None
 
             prices = data["prices"]
             length = data["length"]
@@ -71,27 +58,46 @@ class StockService:
             idx = self._get_index(index, length)
             current_price = prices[idx]
 
-            analysis = self._get_analysis(prices, idx)
+            start = max(0, idx - 10)
+            relevant_prices = prices[start:idx + 1]
 
-            result.append({
+            analysis = self.model.predict(relevant_prices)
+
+            return {
                 "company": company,
                 "name": stock["name"],
                 "price": round(current_price, 2),
                 "confidence": analysis["confidence"],
                 "action": analysis["action"]
-            })
+            }
 
-        return result
+        except Exception as e:
+            logger.error(f"Error processing stock {stock}: {e}")
+            return None
 
     # ========================
-    # 🔥 NEW: FAST SINGLE STOCK (CRITICAL FIX)
+    # CORE API METHODS (PARALLEL)
+    # ========================
+
+    def get_all_stocks(self, index: int = None) -> List[Dict[str, Any]]:
+        """
+        🔥 PARALLEL STOCK PROCESSING (PDC)
+        """
+
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            results = list(executor.map(
+                lambda stock: self._process_single_stock(stock, index),
+                self.stocks
+            ))
+
+        # Remove None values
+        return [r for r in results if r is not None]
+
+    # ========================
+    # SINGLE STOCK (UNCHANGED)
     # ========================
 
     def get_single_stock(self, company: str, index: int = None):
-        """
-        🚀 MUCH faster than filtering get_all_stocks
-        """
-
         data = self.data.get(company)
         if not data:
             return None
@@ -102,7 +108,10 @@ class StockService:
         idx = self._get_index(index, length)
         current_price = prices[idx]
 
-        analysis = self._get_analysis(prices, idx)
+        start = max(0, idx - 10)
+        relevant_prices = prices[start:idx + 1]
+
+        analysis = self.model.predict(relevant_prices)
 
         return {
             "company": company,
