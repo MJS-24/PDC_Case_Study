@@ -1,4 +1,4 @@
-"""Stock trading API routes"""
+"""HIGH-PERFORMANCE stock trading API routes"""
 
 from fastapi import APIRouter, HTTPException
 from services.stock_service import StockService
@@ -11,49 +11,81 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["stock-trading"])
 
-# Initialize services (global, loaded once)
+# ========================
+# GLOBAL SERVICES (LOADED ONCE)
+# ========================
 loader = None
 stock_svc = None
 portfolio_svc = None
 transaction_svc = None
 
+
 def initialize_services_api():
-    """Call this in server.py startup"""
+    """Initialize once at startup"""
     global loader, stock_svc, portfolio_svc, transaction_svc
+
     loader = StockDataLoader()
     stock_svc = StockService(loader)
     transaction_svc = TransactionService()
     portfolio_svc = PortfolioService(stock_svc, transaction_svc)
 
-# ============ HEALTH CHECK ============
+    print("🔥 Services initialized (OPTIMIZED)")
 
+
+# ========================
+# HEALTH
+# ========================
 @router.get("/health")
 async def health_check():
-    """Health check endpoint"""
-    return {"status": "healthy", "message": "Stock Trading API is running"}
+    return {"status": "healthy"}
 
-# ============ STOCK ENDPOINTS ============
 
+# ========================
+# STOCKS (FAST)
+# ========================
 @router.get("/stocks")
 async def get_stocks():
-    """Get all available stocks"""
-    if not stock_svc:
+    """🔥 FAST dashboard endpoint (uses simulation index)"""
+    if not stock_svc or not portfolio_svc:
         raise HTTPException(status_code=500, detail="Services not initialized")
-    return stock_svc.get_all_stocks()
+
+    sim = portfolio_svc.get_simulation_status()
+    index = sim.get("current_index") if sim.get("running") else None
+
+    return stock_svc.get_all_stocks(index=index)
+
 
 @router.get("/stocks/{company}")
 async def get_stock_history(company: str):
-    """Get historical data for a stock"""
-    if not stock_svc:
+    """🔥 FAST single stock endpoint"""
+    if not stock_svc or not portfolio_svc:
         raise HTTPException(status_code=500, detail="Services not initialized")
+
     history = stock_svc.get_stock_history(company)
     if not history:
         raise HTTPException(status_code=404, detail="Stock not found")
-    return {"company": company, "history": history}
 
+    sim = portfolio_svc.get_simulation_status()
+    index = sim.get("current_index") if sim.get("running") else None
+
+    # 🔥 ONLY compute for this stock
+    data = stock_svc.get_all_stocks(index=index)
+    stock_data = next((s for s in data if s["company"] == company), None)
+
+    return {
+        "company": company,
+        "history": history,
+        "price": stock_data["price"] if stock_data else 0,
+        "confidence": stock_data["confidence"] if stock_data else 50,
+        "action": stock_data["action"] if stock_data else "HOLD"
+    }
+
+
+# ========================
+# TRADING
+# ========================
 @router.post("/buy")
 async def buy_stock(request: dict):
-    """Buy stock"""
     if not portfolio_svc:
         raise HTTPException(status_code=500, detail="Services not initialized")
 
@@ -63,15 +95,11 @@ async def buy_stock(request: dict):
     if not company:
         raise HTTPException(status_code=400, detail="Company required")
 
-    result = portfolio_svc.buy_stock(company, quantity)
-    if not result['success']:
-        raise HTTPException(status_code=400, detail=result['message'])
+    return portfolio_svc.buy_stock(company, quantity)
 
-    return result
 
 @router.post("/sell")
 async def sell_stock(request: dict):
-    """Sell stock"""
     if not portfolio_svc:
         raise HTTPException(status_code=500, detail="Services not initialized")
 
@@ -81,29 +109,28 @@ async def sell_stock(request: dict):
     if not company:
         raise HTTPException(status_code=400, detail="Company required")
 
-    result = portfolio_svc.sell_stock(company, quantity)
-    if not result['success']:
-        raise HTTPException(status_code=400, detail=result['message'])
+    return portfolio_svc.sell_stock(company, quantity)
 
-    return result
 
+# ========================
+# PORTFOLIO
+# ========================
 @router.get("/portfolio")
 async def get_portfolio():
-    """Get user portfolio"""
     if not portfolio_svc:
         raise HTTPException(status_code=500, detail="Services not initialized")
     return portfolio_svc.get_portfolio()
 
+
 @router.get("/balance")
 async def get_balance():
-    """Get current balance"""
     if not portfolio_svc:
         raise HTTPException(status_code=500, detail="Services not initialized")
     return {"balance": portfolio_svc.get_balance()}
 
-@router.post("/balance/subtract")
-async def subtract_balance(request: dict):
-    """Subtract funds from balance"""
+
+@router.post("/balance/add")
+async def add_balance(request: dict):
     if not portfolio_svc:
         raise HTTPException(status_code=500, detail="Services not initialized")
 
@@ -111,14 +138,50 @@ async def subtract_balance(request: dict):
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be positive")
 
-    result = portfolio_svc.subtract_balance(amount)
-    if not result['success']:
-        raise HTTPException(status_code=400, detail=result['message'])
+    return portfolio_svc.add_balance(amount)
 
-    return result
+
+@router.post("/balance/subtract")
+async def subtract_balance(request: dict):
+    if not portfolio_svc:
+        raise HTTPException(status_code=500, detail="Services not initialized")
+
+    amount = request.get("amount", 0)
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be positive")
+
+    return portfolio_svc.subtract_balance(amount)
+
+
+# ========================
+# SIMULATION
+# ========================
+@router.post("/simulation/start")
+async def start_simulation():
+    if not portfolio_svc:
+        raise HTTPException(status_code=500, detail="Services not initialized")
+    return portfolio_svc.start_simulation()
+
+
+@router.post("/simulation/stop")
+async def stop_simulation():
+    if not portfolio_svc:
+        raise HTTPException(status_code=500, detail="Services not initialized")
+    return portfolio_svc.stop_simulation()
+
+
+@router.get("/simulation/status")
+async def get_simulation_status():
+    if not portfolio_svc:
+        raise HTTPException(status_code=500, detail="Services not initialized")
+    return portfolio_svc.get_simulation_status()
+
+
+# ========================
+# TRANSACTIONS
+# ========================
 @router.get("/transactions")
 async def get_transactions():
-    """Get transaction history"""
     if not transaction_svc:
         raise HTTPException(status_code=500, detail="Services not initialized")
     return {"transactions": transaction_svc.get_transactions()}

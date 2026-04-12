@@ -1,76 +1,113 @@
 import React, { useEffect, useState } from 'react';
-import { balanceApi } from '../services/api';
+import { balanceApi, simulationApi } from '../services/api';
 
 export default function SettingsPage() {
   const [balance, setBalance] = useState(0);
   const [addAmount, setAddAmount] = useState('');
   const [subtractAmount, setSubtractAmount] = useState('');
+  const [simulationRunning, setSimulationRunning] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetchBalance();
+    fetchAll();
   }, []);
 
-  const fetchBalance = async () => {
+  const fetchAll = async () => {
+    setLoading(true);
     try {
-      const data = await balanceApi.getBalance();
-      setBalance(data.balance);
+      const [balanceData, simData] = await Promise.all([
+        balanceApi.getBalance(),
+        simulationApi.getSimulationStatus()
+      ]);
+
+      setBalance(balanceData.balance ?? 0);
+      setSimulationRunning(simData.running ?? false);
       setError(null);
     } catch (err) {
-      console.error('Error fetching balance:', err);
-      setError('Failed to fetch balance');
+      console.error(err);
+      setError('Failed to load settings');
     } finally {
       setLoading(false);
     }
   };
 
+  // ========================
+  // BALANCE FIXED
+  // ========================
+
   const handleAddFunds = async () => {
     const amount = parseFloat(addAmount);
+
     if (isNaN(amount) || amount <= 0) {
-      setError('Please enter a valid positive amount');
+      setError('Enter valid amount');
       return;
     }
 
     try {
       const result = await balanceApi.addBalance(amount);
+
       if (result.success) {
-        setBalance(result.new_balance);
+        setBalance(result.balance); // 🔥 FIXED
         setAddAmount('');
         setError(null);
       } else {
-        setError(result.message);
+        setError(result.message || 'Failed to add funds');
       }
     } catch (err) {
-      console.error('Error adding funds:', err);
-      setError('Failed to add funds');
+      console.error(err);
+      setError(err?.response?.data?.detail || 'Failed to add funds');
     }
   };
 
   const handleSubtractFunds = async () => {
     const amount = parseFloat(subtractAmount);
+
     if (isNaN(amount) || amount <= 0) {
-      setError('Please enter a valid positive amount');
+      setError('Enter valid amount');
       return;
     }
 
     if (amount > balance) {
-      setError('Cannot subtract more than current balance');
+      setError('Insufficient balance');
       return;
     }
 
     try {
       const result = await balanceApi.subtractBalance(amount);
+
       if (result.success) {
-        setBalance(result.new_balance);
+        setBalance(result.balance); // 🔥 FIXED
         setSubtractAmount('');
         setError(null);
       } else {
-        setError(result.message);
+        setError(result.message || 'Failed to subtract funds');
       }
     } catch (err) {
-      console.error('Error subtracting funds:', err);
-      setError('Failed to subtract funds');
+      console.error(err);
+      setError(err?.response?.data?.detail || 'Failed to subtract funds');
+    }
+  };
+
+  // ========================
+  // SIMULATION FIXED
+  // ========================
+
+  const toggleSimulation = async () => {
+    try {
+      if (simulationRunning) {
+        await simulationApi.stopSimulation();
+      } else {
+        await simulationApi.startSimulation();
+      }
+
+      // 🔥 ALWAYS REFRESH REAL STATE
+      const updated = await simulationApi.getSimulationStatus();
+      setSimulationRunning(updated.running);
+
+    } catch (err) {
+      console.error(err);
+      setError(err?.response?.data?.detail || 'Simulation error');
     }
   };
 
@@ -82,71 +119,65 @@ export default function SettingsPage() {
     <div className="max-w-xl mx-auto p-6">
       <h1 className="text-3xl font-bold text-white mb-8 text-center">⚙️ Settings</h1>
 
-      <div className="bg-slate-800 text-white rounded-xl shadow-lg p-6">
-        <h2 className="text-xl font-semibold mb-4">💰 Account Balance</h2>
+      {/* BALANCE */}
+      <div className="bg-slate-800 text-white rounded-xl p-6 mb-6">
+        <h2 className="text-xl mb-4">💰 Balance</h2>
 
-        <div className="mb-6">
-          <p className="text-lg text-gray-300 mb-2">Current Balance</p>
-          <p className="text-3xl font-bold text-green-400">
-            ${balance.toFixed(2)}
-          </p>
+        <p className="text-3xl text-green-400 mb-6">
+          ${balance.toFixed(2)}
+        </p>
+
+        {/* ADD */}
+        <div className="flex gap-2 mb-4">
+          <input
+            type="number"
+            value={addAmount}
+            onChange={(e) => setAddAmount(e.target.value)}
+            className="flex-1 p-2 bg-gray-700 text-white"
+            placeholder="Add amount"
+          />
+          <button onClick={handleAddFunds} className="bg-green-500 px-4">
+            Add
+          </button>
         </div>
 
-        <div className="space-y-4">
-          {/* Add Funds */}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Add Funds
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="number"
-                value={addAmount}
-                onChange={(e) => setAddAmount(e.target.value)}
-                placeholder="Enter amount"
-                className="flex-1 px-3 py-2 bg-gray-700 text-white rounded-lg focus:outline-none focus:border-green-500"
-                min="0"
-                step="0.01"
-              />
-              <button
-                onClick={handleAddFunds}
-                className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg transition-colors"
-              >
-                Add
-              </button>
-            </div>
-          </div>
-
-          {/* Subtract Funds */}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Subtract Funds
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="number"
-                value={subtractAmount}
-                onChange={(e) => setSubtractAmount(e.target.value)}
-                placeholder="Enter amount"
-                className="flex-1 px-3 py-2 bg-gray-700 text-white rounded-lg focus:outline-none focus:border-red-500"
-                min="0"
-                step="0.01"
-              />
-              <button
-                onClick={handleSubtractFunds}
-                className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors"
-              >
-                Subtract
-              </button>
-            </div>
-          </div>
+        {/* SUBTRACT */}
+        <div className="flex gap-2">
+          <input
+            type="number"
+            value={subtractAmount}
+            onChange={(e) => setSubtractAmount(e.target.value)}
+            className="flex-1 p-2 bg-gray-700 text-white"
+            placeholder="Subtract amount"
+          />
+          <button onClick={handleSubtractFunds} className="bg-red-500 px-4">
+            Subtract
+          </button>
         </div>
 
         {error && (
-          <div className="mt-4 text-red-400 bg-red-900 p-3 rounded-lg">
-            {error}
-          </div>
+          <div className="mt-4 text-red-400">{error}</div>
         )}
+      </div>
+
+      {/* SIMULATION */}
+      <div className="bg-slate-800 text-white rounded-xl p-6">
+        <h2 className="text-xl mb-4">🎯 Simulation</h2>
+
+        <p className="mb-4">
+          Status: <span className={simulationRunning ? 'text-green-400' : 'text-red-400'}>
+            {simulationRunning ? 'Running' : 'Stopped'}
+          </span>
+        </p>
+
+        <button
+          onClick={toggleSimulation}
+          className={`px-6 py-2 ${
+            simulationRunning ? 'bg-red-500' : 'bg-green-500'
+          }`}
+        >
+          {simulationRunning ? 'Stop' : 'Start'}
+        </button>
       </div>
     </div>
   );

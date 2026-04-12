@@ -9,130 +9,102 @@ const apiClient = axios.create({
   },
 });
 
+// ========================
+// HEALTH
+// ========================
 export const healthCheck = async () => {
-  try {
-    const response = await apiClient.get('/health');
-    return response.data;
-  } catch (error) {
-    console.error('Health check failed:', error);
-    throw error;
-  }
+  const response = await apiClient.get('/health');
+  return response.data;
 };
 
+// ========================
+// DASHBOARD
+// ========================
 export const dashboardApi = {
   getSummary: async () => {
-    try {
-      const response = await apiClient.get('/dashboard');
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching dashboard:', error);
-      throw error;
-    }
+    const response = await apiClient.get('/dashboard');
+    return response.data;
   },
 };
 
+// ========================
+// STOCKS
+// ========================
 export const stockApi = {
   getAllStocks: async () => {
-    try {
-      const response = await apiClient.get('/stocks');
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching stocks:', error);
-      throw error;
-    }
+    const response = await apiClient.get('/stocks');
+    return response.data;
   },
 
   getStockHistory: async (company) => {
-    try {
-      const response = await apiClient.get(`/stocks/${company}`);
-      return response.data;
-    } catch (error) {
-      console.error(`Error fetching history for ${company}:`, error);
-      throw error;
-    }
+    const response = await apiClient.get(`/stocks/${company}`);
+    return response.data;
   },
 };
 
+// ========================
+// PORTFOLIO
+// ========================
 export const portfolioApi = {
   getPortfolio: async () => {
-    try {
-      const response = await apiClient.get('/portfolio');
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching portfolio:', error);
-      throw error;
-    }
+    const response = await apiClient.get('/portfolio');
+    return response.data;
   },
 
   getTransactions: async () => {
-    try {
-      const response = await apiClient.get('/transactions');
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching transactions:', error);
-      throw error;
-    }
+    const response = await apiClient.get('/transactions');
+    return response.data;
   },
 
-  buyStock: async (company, quantity) => {
-    try {
-      const response = await apiClient.post('/buy', {
-        company,
-        quantity,
-      });
-      return response.data;
-    } catch (error) {
-      console.error(`Error buying ${company}:`, error);
-      throw error;
-    }
+  // 🔥 FIXED: accepts object payload
+  buyStock: async (payload) => {
+    const response = await apiClient.post('/buy', payload);
+    return response.data;
   },
 
-  sellStock: async (company, quantity) => {
-    try {
-      const response = await apiClient.post('/sell', {
-        company,
-        quantity,
-      });
-      return response.data;
-    } catch (error) {
-      console.error(`Error selling ${company}:`, error);
-      throw error;
-    }
+  // 🔥 FIXED: accepts object payload
+  sellStock: async (payload) => {
+    const response = await apiClient.post('/sell', payload);
+    return response.data;
   },
 };
 
+// ========================
+// BALANCE
+// ========================
 export const balanceApi = {
   getBalance: async () => {
-    try {
-      const response = await apiClient.get('/balance');
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching balance:', error);
-      throw error;
-    }
+    const response = await apiClient.get('/balance');
+    return response.data;
   },
 
   addBalance: async (amount) => {
-    try {
-      const response = await apiClient.post('/balance/add', {
-        amount,
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Error adding balance:', error);
-      throw error;
-    }
+    const response = await apiClient.post('/balance/add', { amount });
+    return response.data;
   },
 
   subtractBalance: async (amount) => {
-    try {
-      const response = await apiClient.post('/balance/subtract', {
-        amount,
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Error subtracting balance:', error);
-      throw error;
-    }
+    const response = await apiClient.post('/balance/subtract', { amount });
+    return response.data;
+  },
+};
+
+// ========================
+// SIMULATION
+// ========================
+export const simulationApi = {
+  startSimulation: async () => {
+    const response = await apiClient.post('/simulation/start');
+    return response.data;
+  },
+
+  stopSimulation: async () => {
+    const response = await apiClient.post('/simulation/stop');
+    return response.data;
+  },
+
+  getSimulationStatus: async () => {
+    const response = await apiClient.get('/simulation/status');
+    return response.data;
   },
 };

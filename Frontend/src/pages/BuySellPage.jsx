@@ -9,8 +9,10 @@ export default function BuySellPage({ selectedCompany, onCompanyChange }) {
   const [portfolio, setPortfolio] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
-  const [transactionType, setTransactionType] = useState('buy');
   const [availableStocks, setAvailableStocks] = useState([]);
+  const [confidence, setConfidence] = useState(50.0);
+  const [action, setAction] = useState('HOLD');
+  const [currentPrice, setCurrentPrice] = useState(0); // 🔥 NEW
 
   useEffect(() => {
     setCompany(selectedCompany || 'AAPL');
@@ -27,30 +29,48 @@ export default function BuySellPage({ selectedCompany, onCompanyChange }) {
   const fetchStocks = async () => {
     try {
       const stocks = await stockApi.getAllStocks();
-      setAvailableStocks(stocks);
+
+      // 🔥 normalize
+      const normalized = stocks.map(s => ({
+        ...s,
+        current_price: s.price ?? 0
+      }));
+
+      setAvailableStocks(normalized);
     } catch (error) {
       console.error('Error fetching stocks:', error);
     }
   };
 
   const fetchData = async () => {
-    console.log('BuySellPage: Fetching data for', company);
     setLoading(true);
     try {
-      const [historyData, portfolioData] = await Promise.all([
+      const [historyData, portfolioData, stocks] = await Promise.all([
         stockApi.getStockHistory(company),
         portfolioApi.getPortfolio(),
+        stockApi.getAllStocks(), // 🔥 get live price
       ]);
-      console.log('BuySellPage: Data fetched', { historyData, portfolioData });
+
       setHistory(historyData.history || []);
+      setConfidence(historyData.confidence || 50.0);
+      setAction(historyData.action || 'HOLD');
       setPortfolio(portfolioData);
+
+      // 🔥 get REAL current price (simulation aware)
+      const stock = stocks.find(s => s.company === company);
+      setCurrentPrice(stock?.price ?? 0);
+
     } catch (error) {
-      console.error('BuySellPage: Error fetching data:', error);
+      console.error(error);
       setMessage({ type: 'error', text: 'Failed to load data' });
     } finally {
       setLoading(false);
     }
   };
+
+  // ========================
+  // FIXED TRANSACTIONS
+  // ========================
 
   const handleBuy = async () => {
     if (quantity <= 0) {
@@ -59,7 +79,11 @@ export default function BuySellPage({ selectedCompany, onCompanyChange }) {
     }
 
     try {
-      const result = await portfolioApi.buyStock(company, parseInt(quantity));
+      const result = await portfolioApi.buyStock({
+        company,
+        quantity: parseInt(quantity),
+      }); // 🔥 FIXED PAYLOAD
+
       if (result.success) {
         setMessage({
           type: 'success',
@@ -67,13 +91,15 @@ export default function BuySellPage({ selectedCompany, onCompanyChange }) {
         });
         setQuantity(1);
         fetchData();
-        if (onCompanyChange) onCompanyChange(company);
       } else {
         setMessage({ type: 'error', text: result.message });
       }
     } catch (error) {
-      setMessage({ type: 'error', text: 'Transaction failed' });
       console.error(error);
+      setMessage({
+        type: 'error',
+        text: error?.response?.data?.detail || 'Transaction failed',
+      });
     }
   };
 
@@ -84,7 +110,11 @@ export default function BuySellPage({ selectedCompany, onCompanyChange }) {
     }
 
     try {
-      const result = await portfolioApi.sellStock(company, parseInt(quantity));
+      const result = await portfolioApi.sellStock({
+        company,
+        quantity: parseInt(quantity),
+      }); // 🔥 FIXED PAYLOAD
+
       if (result.success) {
         setMessage({
           type: 'success',
@@ -92,141 +122,97 @@ export default function BuySellPage({ selectedCompany, onCompanyChange }) {
         });
         setQuantity(1);
         fetchData();
-        if (onCompanyChange) onCompanyChange(company);
       } else {
         setMessage({ type: 'error', text: result.message });
       }
     } catch (error) {
-      setMessage({ type: 'error', text: 'Transaction failed' });
       console.error(error);
+      setMessage({
+        type: 'error',
+        text: error?.response?.data?.detail || 'Transaction failed',
+      });
     }
   };
 
   const holding = portfolio?.holdings?.find(h => h.company === company);
-  const currentPrice = history.length > 0 ? history[history.length - 1].close : 0;
   const currentValue = currentPrice * quantity;
 
   return (
     <div className="max-w-6xl mx-auto p-6">
-      <h1 className="text-3xl font-bold text-white mb-8 text-center">💰 Buy / Sell Stocks</h1>
+      <h1 className="text-3xl font-bold text-white mb-8 text-center">
+        💰 Buy / Sell Stocks
+      </h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
         {/* Chart */}
         <div className="lg:col-span-2">
           {loading ? (
-            <div className="bg-gray-800 rounded-lg p-6 text-center text-gray-400">
-              Loading chart data...
+            <div className="bg-gray-800 p-6 text-center text-gray-400">
+              Loading chart...
             </div>
           ) : history.length > 0 ? (
             <StockChart data={history} symbol={company} />
           ) : (
-            <div className="bg-gray-800 rounded-lg p-6 text-center text-gray-400">
-              No chart data available for {company}
+            <div className="bg-gray-800 p-6 text-center text-gray-400">
+              No data
             </div>
           )}
         </div>
 
         {/* Trade Panel */}
-        <div>
-          <div className="bg-gray-800 rounded-lg p-6 shadow-lg">
-            {/* Stock Selector */}
-            <div className="mb-6">
-              <label className="block text-gray-300 text-sm mb-2">
-                Select Company
-              </label>
-              <select
-                value={company}
-                onChange={(e) => setCompany(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-700 text-white rounded-lg focus:outline-none focus:border-green-500"
-              >
-                {availableStocks.map((stock) => (
-                  <option key={stock.company} value={stock.company}>
-                    {stock.company} - {stock.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+        <div className="bg-gray-800 p-6 rounded-lg">
 
-            <h2 className="text-2xl font-bold text-white mb-6">
-              {company}
-            </h2>
+          <select
+            value={company}
+            onChange={(e) => setCompany(e.target.value)}
+            className="w-full mb-4 p-2 bg-gray-700 text-white"
+          >
+            {availableStocks.map((stock) => (
+              <option key={stock.company} value={stock.company}>
+                {stock.company}
+              </option>
+            ))}
+          </select>
 
-            <div className="space-y-3 mb-6">
-              <div className="bg-gray-700 rounded-lg p-3">
-                <p className="text-gray-400 text-sm">Current Price</p>
-                <p className="text-2xl font-bold text-green-400">
-                  ${currentPrice.toFixed(2)}
-                </p>
-              </div>
+          <p className="text-green-400 text-2xl mb-4">
+            ${currentPrice.toFixed(2)}
+          </p>
 
-              {holding && (
-                <div className="bg-gray-700 rounded-lg p-3">
-                  <p className="text-gray-400 text-sm">You Own</p>
-                  <p className="text-lg font-bold text-white">
-                    {holding.shares} shares
-                  </p>
-                  <p className="text-xs text-gray-400">
-                    @ ${holding.avg_price.toFixed(2)}
-                  </p>
-                </div>
-              )}
-            </div>
+          <p className="text-blue-400">Confidence: {confidence}%</p>
+          <p className="text-yellow-400 mb-4">Action: {action}</p>
 
-            {/* Trade Section */}
-            <div className="border-t border-gray-700 pt-6">
-              <div className="mb-4">
-                <label className="block text-gray-300 text-sm mb-2">
-                  Quantity
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-700 text-white rounded-lg focus:outline-none focus:border-green-500"
-                />
-              </div>
+          {holding && (
+            <p className="text-white mb-4">
+              You own: {holding.shares}
+            </p>
+          )}
 
-              <div className="mb-4 text-sm">
-                <p className="text-gray-400">Total Value</p>
-                <p className="text-xl font-bold text-white">
-                  ${currentValue.toFixed(2)}
-                </p>
-              </div>
+          <input
+            type="number"
+            value={quantity}
+            onChange={(e) => setQuantity(e.target.value)}
+            className="w-full mb-4 p-2 bg-gray-700 text-white"
+          />
 
-              <div className="space-y-2">
-                <button
-                  onClick={handleBuy}
-                  disabled={loading}
-                  className="w-full bg-green-500 hover:bg-green-600 text-white py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-600"
-                >
-                  🟢 Buy Now
-                </button>
+          <p className="text-white mb-4">
+            Total: ${currentValue.toFixed(2)}
+          </p>
 
-                {holding && (
-                  <button
-                    onClick={handleSell}
-                    disabled={loading}
-                    className="w-full bg-red-500 hover:bg-red-600 text-white py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-600"
-                  >
-                    🔴 Sell Now
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
+          <button onClick={handleBuy} className="w-full bg-green-500 p-2 mb-2">
+            Buy
+          </button>
+
+          {holding && (
+            <button onClick={handleSell} className="w-full bg-red-500 p-2">
+              Sell
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Message */}
       {message && (
-        <div
-          className={`mt-6 p-4 rounded-lg ${
-            message.type === 'success'
-              ? 'bg-green-900 text-green-300'
-              : 'bg-red-900 text-red-300'
-          }`}
-        >
+        <div className="mt-4 p-3 bg-gray-700 text-white">
           {message.text}
         </div>
       )}
