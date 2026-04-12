@@ -1,14 +1,15 @@
-"""HIGH-PERFORMANCE stock service (simulation-aware + stable)"""
+"""ML-OPTIMIZED stock service (FAST + simulation-aware + scalable)"""
 
 from typing import List, Dict, Any
 from data_processing.loaders import StockDataLoader
+from models.ml_model import StockMLModel
 import logging
 
 logger = logging.getLogger(__name__)
 
 
 class StockService:
-    """Ultra-fast stock service"""
+    """Ultra-fast stock service with ML (optimized)"""
 
     def __init__(self, loader: StockDataLoader):
         self.loader = loader
@@ -17,31 +18,34 @@ class StockService:
         self.stocks = self.loader.get_stocks_list()
         self.data = self.loader.stock_data
 
+        # 🔥 ML MODEL
+        self.model = StockMLModel()
+        self._train_model()
+
     # ========================
-    # ANALYSIS (FAST)
+    # ML TRAINING (ONCE)
     # ========================
 
-    def analyze_prices(self, prices: List[float]) -> Dict[str, Any]:
-        if len(prices) < 5:
-            return {"confidence": 50.0, "action": "HOLD"}
+    def _train_model(self):
+        try:
+            self.model.train(self.data)
+            logger.info("✅ ML model trained (optimized)")
+        except Exception as e:
+            logger.error(f"ML training failed: {e}")
 
-        recent = prices[-5:]
-        trend = recent[-1] - recent[0]
-        avg_price = sum(recent) / len(recent)
+    # ========================
+    # INTERNAL UTIL (FAST)
+    # ========================
 
-        confidence = min(max((abs(trend) / avg_price) * 100, 0), 100)
+    def _get_index(self, index, length):
+        if index is not None:
+            return min(max(index, 0), length - 1)
+        return length - 1
 
-        if trend > 0 and confidence > 70:
-            action = "BUY"
-        elif trend < 0 and confidence > 60:
-            action = "SELL"
-        else:
-            action = "HOLD"
-
-        return {
-            "confidence": round(confidence, 2),
-            "action": action
-        }
+    def _get_analysis(self, prices, idx):
+        start = max(0, idx - 10)
+        relevant_prices = prices[start:idx + 1]
+        return self.model.predict(relevant_prices)
 
     # ========================
     # CORE API METHODS
@@ -49,7 +53,7 @@ class StockService:
 
     def get_all_stocks(self, index: int = None) -> List[Dict[str, Any]]:
         """
-        🔥 Simulation-aware stock list
+        🔥 Optimized stock list (still ML-powered)
         """
 
         result = []
@@ -64,19 +68,10 @@ class StockService:
             prices = data["prices"]
             length = data["length"]
 
-            # 🔥 ALWAYS safe index handling
-            if index is not None:
-                idx = min(max(index, 0), length - 1)
-            else:
-                idx = length - 1  # fallback
-
+            idx = self._get_index(index, length)
             current_price = prices[idx]
 
-            # 🔥 analysis window (last 5 from index)
-            start = max(0, idx - 5)
-            relevant_prices = prices[start:idx + 1]
-
-            analysis = self.analyze_prices(relevant_prices)
+            analysis = self._get_analysis(prices, idx)
 
             result.append({
                 "company": company,
@@ -88,11 +83,39 @@ class StockService:
 
         return result
 
-    def get_stock_history(self, company: str, limit: int = 100, index: int = None) -> List[Dict[str, Any]]:
+    # ========================
+    # 🔥 NEW: FAST SINGLE STOCK (CRITICAL FIX)
+    # ========================
+
+    def get_single_stock(self, company: str, index: int = None):
         """
-        🔥 Simulation-aware history
+        🚀 MUCH faster than filtering get_all_stocks
         """
 
+        data = self.data.get(company)
+        if not data:
+            return None
+
+        prices = data["prices"]
+        length = data["length"]
+
+        idx = self._get_index(index, length)
+        current_price = prices[idx]
+
+        analysis = self._get_analysis(prices, idx)
+
+        return {
+            "company": company,
+            "price": round(current_price, 2),
+            "confidence": analysis["confidence"],
+            "action": analysis["action"]
+        }
+
+    # ========================
+    # HISTORY
+    # ========================
+
+    def get_stock_history(self, company: str, limit: int = 100, index: int = None) -> List[Dict[str, Any]]:
         data = self.data.get(company)
         if not data:
             return []
@@ -100,12 +123,7 @@ class StockService:
         prices = data["prices"]
         length = data["length"]
 
-        # 🔥 respect simulation index
-        if index is not None:
-            end = min(index, length - 1)
-        else:
-            end = length - 1
-
+        end = self._get_index(index, length)
         start = max(0, end - limit)
 
         return [
@@ -115,6 +133,10 @@ class StockService:
             }
             for i in range(start, end + 1)
         ]
+
+    # ========================
+    # PRICE
+    # ========================
 
     def get_price_at_index(self, company: str, index: int) -> float:
         return self.loader.get_price_at_index(company, index)
