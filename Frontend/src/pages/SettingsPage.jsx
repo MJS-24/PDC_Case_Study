@@ -17,12 +17,19 @@ export default function SettingsPage() {
   const [workers, setWorkers] = useState(8);
   const [graphData, setGraphData] = useState([]);
 
-  // 🔥 NEW: popup state
   const [showPopup, setShowPopup] = useState(false);
+
+  // 🔥 NEW
+  const [trainingTime, setTrainingTime] = useState(0);
+  const [trainingMode, setTrainingMode] = useState("FAST");
+  // 🔥 NEW: Training Loading State
+  const [trainingLoading, setTrainingLoading] = useState(false);
 
   useEffect(() => {
     fetchAll();
     fetchWorkers();
+    fetchMLStats();
+    fetchTrainingMode(); // 🔥 NEW
   }, []);
 
   const fetchAll = async () => {
@@ -40,6 +47,45 @@ export default function SettingsPage() {
     const data = await performanceApi.getWorkers();
     setWorkers(data.workers);
   };
+
+  // 🔥 NEW FUNCTION
+  const fetchMLStats = async () => {
+      try {
+        const data = await performanceApi.getMLStats();
+        setTrainingTime(data.training_time ?? 0);
+      } catch (err) {
+        console.error('ML stats error:', err);
+      }
+    };
+
+    const fetchTrainingMode = async () => {
+    try {
+      const data = await performanceApi.getTrainingMode();
+      setTrainingMode(data.mode);
+      setTrainingTime(data.training_time);
+    } catch (err) {
+      console.error('Training mode error:', err);
+    }
+  };
+
+  // 🔥 NEW: Training mode handler with loading state
+  const setMode = async (mode) => {
+    setTrainingLoading(true);
+    try {
+      const res = await performanceApi.setTrainingMode(mode);
+
+      setTrainingMode(res.mode);
+      setTrainingTime(res.training_time);
+
+      setShowPopup(true);
+      setTimeout(() => setShowPopup(false), 2000);
+    } catch (err) {
+      console.error('Training mode error:', err);
+    } finally {
+      setTrainingLoading(false);
+    }
+  };
+
 
   // ========================
   // PERFORMANCE
@@ -81,7 +127,6 @@ export default function SettingsPage() {
     setGraphData(results);
   };
 
-  // 🔥 UPDATED APPLY WORKERS (WITH POPUP)
   const applyWorkers = async () => {
     await performanceApi.setWorkers(Number(workers));
     await runPerformanceTest();
@@ -198,6 +243,50 @@ export default function SettingsPage() {
 
           <h2 className="text-xl mb-4">⚡ Parallel Performance</h2>
 
+
+          {/* 🔥 TRAINING MODE */}
+          <div className="mb-4">
+            <p className="mb-2">🧠 Training Mode</p>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setMode("FAST")}
+                disabled={trainingLoading}
+                className={`px-4 py-2 rounded-lg transition ${
+                  trainingMode === "FAST"
+                    ? "bg-green-500 scale-105"
+                    : "bg-gray-600 hover:scale-105"
+                } ${
+                  trainingLoading ? "opacity-50 cursor-not-allowed" : ""
+                }`}
+              >
+                {trainingLoading && trainingMode === "FAST" ? "Training..." : "FAST ⚡"}
+              </button>
+
+              <button
+                onClick={() => setMode("FULL")}
+                disabled={trainingLoading}
+                className={`px-4 py-2 rounded-lg transition ${
+                  trainingMode === "FULL"
+                    ? "bg-purple-500 scale-105"
+                    : "bg-gray-600 hover:scale-105"
+                } ${
+                  trainingLoading ? "opacity-50 cursor-not-allowed" : ""
+                }`}
+              >
+                {trainingLoading && trainingMode === "FULL" ? "Training..." : "FULL 🧠"}
+              </button>
+            </div>
+
+            {/* 🔥 NEW: Training Loading Feedback */}
+            {trainingLoading && (
+              <div className="mt-3 flex items-center gap-2 text-blue-400 animate-pulse">
+                <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                <span>⚙️ Training model... please wait</span>
+              </div>
+            )}
+          </div>      
+
           {/* WORKER CONTROL UI */}
           <div className="mb-4">
 
@@ -225,7 +314,10 @@ export default function SettingsPage() {
 
             <button
               onClick={applyWorkers}
-              className="mt-3 bg-blue-500 w-full py-2 rounded-lg hover:scale-105 active:scale-95 transition"
+              disabled={trainingLoading}
+              className={`mt-3 bg-blue-500 w-full py-2 rounded-lg hover:scale-105 active:scale-95 transition ${
+                trainingLoading ? "opacity-50 cursor-not-allowed" : ""
+              }`}
             >
               Apply Workers
             </button>
@@ -237,18 +329,28 @@ export default function SettingsPage() {
             <p>📊 Confidence: <span className="text-green-400">{avgConfidence}%</span></p>
             <p>⏱ Time: <span className="text-blue-400">{computationTime} ms</span></p>
             <p>📈 Stocks: <span className="text-yellow-400">{stocksProcessed}</span></p>
+
+            {/* 🔥 NEW LINE */}
+            <p>🧠 Training Time: <span className="text-purple-400">{trainingTime}s</span></p>
+            <p>⚙ Mode: <span className="text-blue-400">{trainingMode}</span></p>
           </div>
 
           <button
             onClick={togglePerformance}
-            className="bg-green-500 w-full py-2 rounded-lg mt-4 hover:scale-105 active:scale-95 transition"
+            disabled={trainingLoading}
+            className={`bg-green-500 w-full py-2 rounded-lg mt-4 hover:scale-105 active:scale-95 transition ${
+              trainingLoading ? "opacity-50 cursor-not-allowed" : ""
+            }`}
           >
             Run Live Test
           </button>
 
           <button
             onClick={runWorkerBenchmark}
-            className="bg-purple-500 w-full py-2 rounded-lg mt-2 hover:scale-105 active:scale-95 transition"
+            disabled={trainingLoading}
+            className={`bg-purple-500 w-full py-2 rounded-lg mt-2 hover:scale-105 active:scale-95 transition ${
+              trainingLoading ? "opacity-50 cursor-not-allowed" : ""
+            }`}
           >
             Run Benchmark
           </button>
@@ -272,7 +374,7 @@ export default function SettingsPage() {
 
       </div>
 
-      {/* 🔥 POPUP */}
+      {/* POPUP */}
       {showPopup && (
         <div className="fixed bottom-6 right-6 bg-green-500 text-white px-6 py-3 rounded-xl shadow-lg animate-bounce">
           ✅ {workers} Workers Applied
